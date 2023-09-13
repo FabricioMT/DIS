@@ -18,7 +18,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from torchvision.transforms.functional import normalize
 import torch.nn.functional as F
-
+from PIL import Image, ImageEnhance, ImageOps
 #### --------------------- DIS dataloader cache ---------------------####
 
 def get_im_gt_name_dict(datasets, flag='valid'):
@@ -193,6 +193,57 @@ class GOSNormalize(object):
 
         return {'imidx':imidx,'image':image, 'label':label, 'shape':shape}
 
+class RandomColorJitter(object):
+
+    def __init__(self, brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1):
+        self.brightness = self._check_input(brightness)
+        self.contrast = self._check_input(contrast)
+        self.saturation = self._check_input(saturation)
+        self.hue = self._check_input(hue, center=0, bound=(-0.5, 0.5))
+
+    def _check_input(self, value, center=1, bound=(0, float('inf'))):
+        if isinstance(value, (int, float)):
+            assert bound[0] <= value <= bound[1]
+            return (center - value, center + value)
+        elif isinstance(value, (tuple, list)):
+            assert len(value) == 2
+            assert bound[0] <= value[0] <= bound[1]
+            assert bound[0] <= value[1] <= bound[1]
+            return value
+        else:
+            raise ValueError("Invalid input type. Expected int, float, tuple, or list.")
+
+    def _apply_transform(self, img, enhancer_class, factor_range):
+        factor = random.uniform(factor_range[0], factor_range[1])
+        enhancer = enhancer_class(img)
+        return enhancer.enhance(factor)
+
+    def _adjust_hue(self, img, hue_range):
+        hue_factor = random.uniform(hue_range[0], hue_range[1])
+        img_hsv = img.convert('HSV')
+        img_hsv = np.array(img_hsv)
+        img_hsv[..., 0] = (img_hsv[..., 0] + hue_factor * 255) % 255
+        img_hsv = Image.fromarray(img_hsv, 'HSV')
+        return img_hsv.convert('RGB')
+
+    def __call__(self, sample):
+        imidx, image, label, shape =  sample['imidx'], sample['image'], sample['label'], sample['shape']
+        image = Image.fromarray(np.uint8(image * 255))
+
+        if self.brightness:
+            image = self._apply_transform(image, ImageEnhance.Brightness, self.brightness)
+
+        if self.contrast:
+            image = self._apply_transform(image, ImageEnhance.Contrast, self.contrast)
+
+        if self.saturation:
+            image = self._apply_transform(image, ImageEnhance.Color, self.saturation)
+
+        if self.hue:
+            image = self._adjust_hue(image, self.hue)
+
+        image = np.array(image) / 255.0
+        return {'imidx':imidx,'image':image, 'label':label, 'shape':shape}
 
 class GOSDatasetCache(Dataset):
 
