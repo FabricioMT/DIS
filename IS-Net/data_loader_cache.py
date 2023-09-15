@@ -228,8 +228,8 @@ class RandomColorJitter(object):
 
     def __call__(self, sample):
         imidx, image, label, shape =  sample['imidx'], sample['image'], sample['label'], sample['shape']
-        image = Image.fromarray(np.uint8(image * 255))
-
+        image = Image.fromarray(np.uint8(image * 255), 'RGB')  # Converter para 'RGB'
+        
         if self.brightness:
             image = self._apply_transform(image, ImageEnhance.Brightness, self.brightness)
 
@@ -243,7 +243,11 @@ class RandomColorJitter(object):
             image = self._adjust_hue(image, self.hue)
 
         image = np.array(image) / 255.0
-        return {'imidx':imidx,'image':image, 'label':label, 'shape':shape}
+        
+        # Converter a imagem numpy para um tensor
+        image = torch.from_numpy(image).permute(2, 0, 1).float()
+
+        return {'imidx': imidx, 'image': image, 'label': label, 'shape': shape}
 
 class GOSDatasetCache(Dataset):
 
