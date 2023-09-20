@@ -228,8 +228,10 @@ class RandomColorJitter(object):
 
     def __call__(self, sample):
         imidx, image, label, shape =  sample['imidx'], sample['image'], sample['label'], sample['shape']
-        image = Image.fromarray(np.uint8(image * 255), 'RGB')  # Converter para 'RGB'
-        
+        #image = torch.tensor(image, dtype=torch.float32)
+        image = image.clone().detach()
+        image = transforms.ToPILImage('RGB')(image)
+
         if self.brightness:
             image = self._apply_transform(image, ImageEnhance.Brightness, self.brightness)
 
